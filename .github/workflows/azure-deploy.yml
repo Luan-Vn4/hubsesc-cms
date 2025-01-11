@@ -1,0 +1,57 @@
+name: Build e Deploy do Azure Web App
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AZURE_WEBAPP_NAME: hubsesc-cms
+  NODE_VERSION: '20'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Carrega arquivos do repositório do github
+        uses: actions/checkout@v4
+
+      - name: Define versão do Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: npm install, build, test
+        run: |
+          npm install
+          npm run build --if-present
+          npm run test --if-present
+
+      - name: Zipa artefato para realizar deploy
+        run: zip release.zip ./* -r
+
+      - name: Upload do artefato zipado para job de deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-app
+          path: release.zip
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Carrega artefato zipado
+        uses: actions/download-artifact@v4
+        with:
+          name: node-app
+
+      - name: Descompacta artefato
+        run: unzip release.zip
+
+      - name: 'Deploy to Azure Web App'
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
